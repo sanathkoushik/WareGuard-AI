@@ -1,0 +1,17 @@
+# Core Vision & AI
+ultralytics>=8.1.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+pandas>=2.0.0
+torch>=2.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+tqdm>=4.66.0
+Pillow>=10.0.0
+
+# Web Dashboard (For Phase 4)
+streamlit>=1.30.0
+
+# Assistant (For Phase 5)
+requests>=2.31.0
