@@ -1,0 +1,343 @@
+{
+  "summary": {
+    "total_events": 5,
+    "duration_seconds": 16.03,
+    "events_by_type": {
+      "drop": 1,
+      "throw": 1,
+      "drag": 1,
+      "improper_stack": 1,
+      "rough_handling": 1
+    },
+    "events_by_severity": {
+      "Low": 0,
+      "Medium": 1,
+      "High": 2,
+      "Critical": 2
+    },
+    "max_risk_score": 100.0,
+    "mean_risk_score": 69.4,
+    "shift_risk_index": 74.4,
+    "shift_severity": "Critical",
+    "events_per_minute": 18.71,
+    "rate_is_reliable": false,
+    "repeat_offender_tracks": [],
+    "top_events": [
+      "EVT-0003 Critical 100 - box #4 travelled 3.0 box-widths through the air over 0.67s at ~4.7 m/s along a ballistic arc; also matched drop (0.95); also matched rough_handling (0.86)",
+      "EVT-0001 Critical 76 - box #2 fell 4.3 box-heights in 0.63s (~5.0 m/s at impact, 100% of free fall) and stopped abruptly",
+      "EVT-0002 High 66 - box #3 dragged right along the floor for 7.4 box-widths over 2.0s",
+      "EVT-0005 High 70 - box #7 handled abruptly (jerk 22.9 h/s^2) with a worker 0.2 box-heights away",
+      "EVT-0004 Medium 36 - box #6 stacked on #5 with 45% overhang for 2.5s"
+    ],
+    "timeline": [
+      {
+        "start_s": 0.0,
+        "end_s": 30.0,
+        "events": 5,
+        "max_risk": 100.0,
+        "types": [
+          "drop",
+          "drag",
+          "throw",
+          "improper_stack",
+          "rough_handling"
+        ]
+      }
+    ],
+    "data_quality_warning": null
+  },
+  "events": [
+    {
+      "event_type": "drop",
+      "track_id": 2,
+      "class_name": "box",
+      "start_frame": 101,
+      "end_frame": 120,
+      "start_time": 3.367,
+      "end_time": 4.0,
+      "confidence": 0.965,
+      "metrics": {
+        "peak_fall_speed": 12.436,
+        "impact_speed_mps": 4.97,
+        "fall_distance_heights": 4.286,
+        "fall_duration_s": 0.633,
+        "gravity_ratio": 1.0,
+        "impact_speed_ratio": 0.14,
+        "ground_clearance_at_start": 4.286,
+        "nearest_person_heights": 2.033,
+        "priority_score": 73.1
+      },
+      "related_track_ids": [
+        100
+      ],
+      "description": "box #2 fell 4.3 box-heights in 0.63s (~5.0 m/s at impact, 100% of free fall) and stopped abruptly",
+      "event_id": "EVT-0001",
+      "risk_score": 75.8,
+      "severity": "Critical",
+      "risk_factors": [
+        "drop baseline (+40)",
+        "impact at 5.0 m/s (+24)",
+        "fell 4.3 box-heights (+12)"
+      ],
+      "duration_seconds": 0.633
+    },
+    {
+      "event_type": "drag",
+      "track_id": 3,
+      "class_name": "box",
+      "start_frame": 157,
+      "end_frame": 217,
+      "start_time": 5.233,
+      "end_time": 7.233,
+      "confidence": 0.959,
+      "metrics": {
+        "drag_distance_heights": 7.429,
+        "drag_duration_s": 2.0,
+        "mean_horizontal_speed": 3.623,
+        "mean_ground_clearance": 0.0,
+        "nearest_person_heights": 0.0,
+        "priority_score": 62.8
+      },
+      "related_track_ids": [
+        100
+      ],
+      "description": "box #3 dragged right along the floor for 7.4 box-widths over 2.0s",
+      "event_id": "EVT-0002",
+      "risk_score": 65.5,
+      "severity": "High",
+      "risk_factors": [
+        "drag baseline (+26)",
+        "dragged 7.4 box-widths (+13)",
+        "sustained 2.0s (+2)",
+        "worker 0.0 box-heights away (+25)"
+      ],
+      "duration_seconds": 2.0
+    },
+    {
+      "event_type": "throw",
+      "track_id": 4,
+      "class_name": "box",
+      "start_frame": 232,
+      "end_frame": 252,
+      "start_time": 7.733,
+      "end_time": 8.4,
+      "confidence": 0.97,
+      "metrics": {
+        "peak_horizontal_speed": 4.571,
+        "launch_speed": 11.646,
+        "launch_speed_mps": 4.66,
+        "horizontal_travel_heights": 3.048,
+        "airborne_duration_s": 0.667,
+        "gravity_ratio": 1.0,
+        "ballistic_arc": 1.0,
+        "nearest_person_heights": 0.0,
+        "also_matched_count": 2.0,
+        "priority_score": 97.0
+      },
+      "related_track_ids": [
+        100
+      ],
+      "description": "box #4 travelled 3.0 box-widths through the air over 0.67s at ~4.7 m/s along a ballistic arc; also matched drop (0.95); also matched rough_handling (0.86)",
+      "event_id": "EVT-0003",
+      "risk_score": 100.0,
+      "severity": "Critical",
+      "risk_factors": [
+        "throw baseline (+52)",
+        "launched at 4.7 m/s (+21)",
+        "travelled 3.0 box-widths (+4)",
+        "worker 0.0 box-heights away (+25)"
+      ],
+      "duration_seconds": 0.667
+    },
+    {
+      "event_type": "improper_stack",
+      "track_id": 6,
+      "class_name": "box",
+      "start_frame": 283,
+      "end_frame": 358,
+      "start_time": 9.433,
+      "end_time": 11.933,
+      "confidence": 0.745,
+      "metrics": {
+        "max_overhang_ratio": 0.45,
+        "max_lean_ratio": 0.0,
+        "stack_duration_s": 2.5,
+        "supporting_track_id": 5.0,
+        "priority_score": 26.5
+      },
+      "related_track_ids": [
+        5
+      ],
+      "description": "box #6 stacked on #5 with 45% overhang for 2.5s",
+      "event_id": "EVT-0004",
+      "risk_score": 35.6,
+      "severity": "Medium",
+      "risk_factors": [
+        "improper stack baseline (+30)",
+        "45% overhang (+5)",
+        "left standing 2s (+0)"
+      ],
+      "duration_seconds": 2.5
+    },
+    {
+      "event_type": "rough_handling",
+      "track_id": 7,
+      "class_name": "box",
+      "start_frame": 386,
+      "end_frame": 393,
+      "start_time": 12.867,
+      "end_time": 13.1,
+      "confidence": 0.874,
+      "metrics": {
+        "peak_speed": 5.333,
+        "peak_jerk": 22.857,
+        "nearest_person_heights": 0.206,
+        "duration_s": 0.233,
+        "priority_score": 61.1
+      },
+      "related_track_ids": [
+        100,
+        101
+      ],
+      "description": "box #7 handled abruptly (jerk 22.9 h/s^2) with a worker 0.2 box-heights away",
+      "event_id": "EVT-0005",
+      "risk_score": 69.9,
+      "severity": "High",
+      "risk_factors": [
+        "rough handling baseline (+34)",
+        "jerk 23 h/s^2 (+7)",
+        "peak 5.3 h/s (+8)",
+        "worker 0.2 box-heights away (+21)"
+      ],
+      "duration_seconds": 0.233
+    }
+  ],
+  "risk_factors": {
+    "EVT-0001": [
+      {
+        "code": "base",
+        "points": 40.0,
+        "detail": "drop baseline"
+      },
+      {
+        "code": "impact_energy",
+        "points": 23.8,
+        "detail": "impact at 5.0 m/s"
+      },
+      {
+        "code": "fall_height",
+        "points": 12.0,
+        "detail": "fell 4.3 box-heights"
+      }
+    ],
+    "EVT-0002": [
+      {
+        "code": "base",
+        "points": 26.0,
+        "detail": "drag baseline"
+      },
+      {
+        "code": "drag_extent",
+        "points": 12.9,
+        "detail": "dragged 7.4 box-widths"
+      },
+      {
+        "code": "drag_duration",
+        "points": 1.6,
+        "detail": "sustained 2.0s"
+      },
+      {
+        "code": "worker_proximity",
+        "points": 25.0,
+        "detail": "worker 0.0 box-heights away"
+      }
+    ],
+    "EVT-0003": [
+      {
+        "code": "base",
+        "points": 52.0,
+        "detail": "throw baseline"
+      },
+      {
+        "code": "launch_energy",
+        "points": 21.3,
+        "detail": "launched at 4.7 m/s"
+      },
+      {
+        "code": "throw_distance",
+        "points": 4.1,
+        "detail": "travelled 3.0 box-widths"
+      },
+      {
+        "code": "worker_proximity",
+        "points": 25.0,
+        "detail": "worker 0.0 box-heights away"
+      }
+    ],
+    "EVT-0004": [
+      {
+        "code": "base",
+        "points": 30.0,
+        "detail": "improper stack baseline"
+      },
+      {
+        "code": "overhang",
+        "points": 5.5,
+        "detail": "45% overhang"
+      },
+      {
+        "code": "stack_persistence",
+        "points": 0.1,
+        "detail": "left standing 2s"
+      }
+    ],
+    "EVT-0005": [
+      {
+        "code": "base",
+        "points": 34.0,
+        "detail": "rough handling baseline"
+      },
+      {
+        "code": "abruptness",
+        "points": 7.2,
+        "detail": "jerk 23 h/s^2"
+      },
+      {
+        "code": "handling_speed",
+        "points": 8.0,
+        "detail": "peak 5.3 h/s"
+      },
+      {
+        "code": "worker_proximity",
+        "points": 20.7,
+        "detail": "worker 0.2 box-heights away"
+      }
+    ]
+  },
+  "scene": {
+    "video_name": "simulated_unloading_shift",
+    "fps": 30.0,
+    "resolution": [
+      1280,
+      720
+    ],
+    "floor_y": 620.0,
+    "source": "ground_truth"
+  },
+  "behavior_summary": {
+    "total_events": 5,
+    "event_counts": {
+      "drop": 1,
+      "throw": 1,
+      "drag": 1,
+      "improper_stack": 1,
+      "rough_handling": 1
+    },
+    "total_tracks": 9,
+    "cargo_tracks": 7,
+    "person_tracks": 2,
+    "usable_tracks": 7,
+    "suppressed_events": 2,
+    "data_quality_warning": null
+  }
+}
