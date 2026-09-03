@@ -20,8 +20,18 @@ Godrej_hackathon/
 │   ├── tracker.py              # Multi-frame kinematics (velocity, acceleration, trajectories)
 │   ├── visualizer.py           # Industrial HUD, bounding boxes & trail overlays
 │   └── pipeline.py            # End-to-end video processing pipeline
+├── run_analysis.py             # CLI entry point for behavior + risk analysis
 ├── behavior/                   # Heuristic Behavior Detection Engine (Phase 2)
+│   ├── schema.py               # Track/event data contract — the source-agnostic seam
+│   ├── thresholds.py           # All tunables, in object-heights per second
+│   ├── features.py             # Smoothed, normalised kinematics
+│   ├── detectors.py            # drop / throw / drag / stacking / rough handling
+│   ├── engine.py               # Orchestration + overlap resolution
+│   └── simulation.py           # Ground-truth track generator (no video needed)
 ├── risk/                       # Risk Assessment & Severity Engine (Phase 3)
+│   ├── scoring.py              # Explainable per-event risk model
+│   ├── engine.py               # Shift roll-up & repeat-offender escalation
+│   └── export.py               # Event JSON/CSV + compact LLM context
 ├── dashboard/                  # Streamlit Web App (Phase 4)
 ├── assistant/                  # LLM Q&A Interface over Event Logs (Phase 5)
 ├── utils/                      # Helper utilities
@@ -55,7 +65,23 @@ python utils/video_generator.py
 ```
 This generates `data/raw_videos/sample_warehouse.mp4`.
 
-### 4. Run Detection & Tracking Pipeline
+### 4. Run Behavior & Risk Analysis (Phases 2-3)
+These packages are **standard-library only** — no torch, cv2, numpy or pandas
+needed, so this runs even without the vision stack installed:
+```bash
+# Prove the engine end-to-end on ground-truth simulated tracks
+python run_analysis.py --simulate demo
+
+# Score an existing detection log
+python run_analysis.py --logs data/logs/detections_sample_warehouse.json
+
+# Run the test suite (48 tests, ~0.3s)
+python -m unittest tests.test_behavior tests.test_risk
+```
+See [docs/behavior-risk.md](docs/behavior-risk.md) for the dashboard and
+assistant integration API.
+
+### 5. Run Detection & Tracking Pipeline
 ```bash
 # Basic run on sample video
 python run_detection.py --input data/raw_videos/sample_warehouse.mp4
@@ -79,8 +105,8 @@ The pipeline produces two logs in `data/logs/`:
 ## 🛠️ Phases Roadmap
 
 - [x] **Phase 1: Setup & Detection Pipeline** (Repo structure, YOLOv8 + ByteTrack, log exporter, HUD video overlay)
-- [ ] **Phase 2: Behavior Detection Logic** (Heuristics for drop, drag, stacking, rough handling)
-- [ ] **Phase 3: Risk Scoring Engine** (Low / Medium / High / Critical with contextual factors)
+- [x] **Phase 2: Behavior Detection Logic** (drop, throw, drag, improper stacking, rough handling — see [docs/behavior-risk.md](docs/behavior-risk.md))
+- [x] **Phase 3: Risk Scoring Engine** (Low / Medium / High / Critical, explainable factors, shift roll-up)
 - [ ] **Phase 4: Streamlit Dashboard** (Video player, timeline, event cards)
 - [ ] **Phase 5: AI Assistant** (LLM-powered supervisor query agent)
 - [ ] **Phase 6: Polish & Submission** (Shift summaries, deck materials)
