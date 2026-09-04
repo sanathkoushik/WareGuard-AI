@@ -90,6 +90,35 @@ python run_detection.py --input data/raw_videos/sample_warehouse.mp4
 python run_detection.py --input data/raw_videos/sample_warehouse.mp4 --model yolov8n.pt --conf 0.25
 ```
 
+### 6. Ask the AI Assistant About a Shift (Phase 5)
+Works from a saved events log or a simulated scenario, no LLM key required —
+falls back to a built-in heuristic responder when `WAREGUARD_LLM_API_KEY` /
+`OPENAI_API_KEY` isn't set:
+```bash
+# One-shot question against a saved log
+python run_assistant.py --logs data/logs/events_sim_demo.json --ask "What was the worst event?"
+
+# Interactive session
+python run_assistant.py --logs data/logs/events_sim_demo.json
+
+# Ask about a fresh simulated shift, no log file needed
+python run_assistant.py --simulate demo --ask "Any repeat offenders?"
+
+# Run the test suite
+python -m unittest tests.test_assistant
+```
+To use a real LLM instead of the heuristic responder, set `OPENAI_API_KEY` (or
+`WAREGUARD_LLM_API_KEY` for a non-OpenAI account) and, for a self-hosted or
+non-OpenAI OpenAI-compatible endpoint, `WAREGUARD_LLM_BASE_URL`.
+
+### 7. Launch the Interactive Dashboard (Phase 4)
+Ties detection, behavior/risk scoring, and the assistant together in one
+Streamlit app - pick a video, run detection, then inspect kinematics, safety
+events, and chat with the assistant, all in the browser:
+```bash
+streamlit run dashboard/app.py
+```
+
 ---
 
 ## 📊 Structured Output Schema
@@ -107,6 +136,6 @@ The pipeline produces two logs in `data/logs/`:
 - [x] **Phase 1: Setup & Detection Pipeline** (Repo structure, YOLOv8 + ByteTrack, log exporter, HUD video overlay)
 - [x] **Phase 2: Behavior Detection Logic** (drop, throw, drag, improper stacking, rough handling — see [docs/behavior-risk.md](docs/behavior-risk.md))
 - [x] **Phase 3: Risk Scoring Engine** (Low / Medium / High / Critical, explainable factors, shift roll-up)
-- [ ] **Phase 4: Streamlit Dashboard** (Video player, timeline, event cards)
-- [ ] **Phase 5: AI Assistant** (LLM-powered supervisor query agent)
+- [x] **Phase 4: Streamlit Dashboard** (Video player, kinematics, detections log, safety events & risk, AI assistant chat — see `dashboard/app.py`)
+- [x] **Phase 5: AI Assistant** (LLM-powered supervisor query agent, offline heuristic fallback — see `assistant/`)
 - [ ] **Phase 6: Polish & Submission** (Shift summaries, deck materials)

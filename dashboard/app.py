@@ -10,6 +10,19 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
+from assistant import WarehouseAssistant
+from behavior import BehaviorEngine
+from behavior.thresholds import PROFILES
+from risk import RiskEngine
+from risk.export import assessment_to_assistant_context
+
+SEVERITY_COLORS = {
+    "Critical": "#f85149",
+    "High": "#d29922",
+    "Medium": "#58a6ff",
+    "Low": "#3fb950",
+}
+
 # Configure Streamlit page
 st.set_page_config(
     page_title="WareGuard AI — Warehouse Video Intelligence",
@@ -67,6 +80,13 @@ st.markdown("""
         border-radius: 4px;
         border: 1px solid #d29922;
     }
+    .badge-severity {
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-weight: 600;
+        margin-right: 6px;
+        display: inline-block;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -119,6 +139,15 @@ with st.sidebar:
 
     run_button = st.button("▶️ Run Detection Pipeline", type="primary", use_container_width=True)
 
+    st.markdown("---")
+    st.subheader("🧠 Behavior & Risk Profile")
+    threshold_profile = st.selectbox(
+        "Threshold Profile",
+        options=list(PROFILES),
+        index=list(PROFILES).index("default"),
+        help="Sensitive flags more, strict flags fewer - see behavior/thresholds.py",
+    )
+
 if selected_video_name:
     input_video_path = RAW_DIR / selected_video_name
     stem = input_video_path.stem
@@ -152,6 +181,18 @@ if selected_video_name:
             metadata = log_json.get("video_metadata", {})
             summary = log_json.get("summary", {})
             detections_data = log_json.get("detections", [])
+
+    # Phases 2-3: behavior detection + risk scoring, run straight off the
+    # detection log. Standard-library only and cheap, so it's safe to
+    # recompute on every rerun rather than caching (see run_analysis.py).
+    behavior_report = None
+    assessment = None
+    if has_logs:
+        try:
+            behavior_report = BehaviorEngine(thresholds=threshold_profile).analyze_json(json_log_path)
+            assessment = RiskEngine().assess(behavior_report)
+        except Exception as exc:
+            st.sidebar.error(f"Behavior/risk analysis failed: {exc}")
 
     # Top KPI Metrics Row
     kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
@@ -194,10 +235,12 @@ if selected_video_name:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Main Dashboard Tabs
-    tab_video, tab_kinematics, tab_table = st.tabs([
+    tab_video, tab_kinematics, tab_table, tab_safety, tab_assistant = st.tabs([
         "📹 Video Playback & HUD",
         "📈 Kinematics & Velocity Analytics",
-        "📋 Detections & Trajectory Log"
+        "📋 Detections & Trajectory Log",
+        "🚨 Safety Events & Risk",
+        "🤖 Ask the Assistant",
     ])
 
     with tab_video:
@@ -292,5 +335,117 @@ if selected_video_name:
                 st.info("Log table is empty.")
         else:
             st.info("No detections log found. Please run the pipeline first.")
+
+    with tab_safety:
+        st.subheader("🚨 Behavior Detection & Risk Assessment (Phases 2-3)")
+        if assessment is None:
+            st.info("Run the detection pipeline first - behavior and risk analysis "
+                     "run automatically on the resulting log.")
+        else:
+            warning = behavior_report.data_quality_warning()
+            if warning:
+                st.warning(f"⚠️ Data quality: {warning}")
+
+            shift = assessment.summary
+            st.markdown(f"**{shift.headline()}**")
+
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Shift Risk Index", f"{shift.shift_risk_index:.0f}/100", shift.shift_severity)
+            m2.metric("Total Events", shift.total_events)
+            m3.metric("Worst Event", f"{shift.max_risk_score:.0f}/100")
+            m4.metric(
+                "Events / min",
+                f"{shift.events_per_minute:.1f}",
+                "extrapolated" if not shift.rate_is_reliable else None,
+            )
+
+            if shift.total_events:
+                col_type, col_sev = st.columns(2)
+                with col_type:
+                    st.write("**Events by Type**")
+                    st.bar_chart(pd.Series({k: v for k, v in shift.events_by_type.items() if v}))
+                with col_sev:
+                    st.write("**Events by Severity**")
+                    st.bar_chart(pd.Series({k: v for k, v in shift.events_by_severity.items() if v}))
+
+                st.write("**Shift Timeline (30s buckets)**")
+                timeline_df = pd.DataFrame(shift.timeline).set_index("start_s")
+                st.bar_chart(timeline_df[["events", "max_risk"]])
+
+                st.write("**Events (highest priority first)**")
+                legend = " ".join(
+                    f'<span class="badge-severity" style="background-color:{c}22;color:{c};border:1px solid {c};">{s}</span>'
+                    for s, c in SEVERITY_COLORS.items()
+                )
+                st.markdown(legend, unsafe_allow_html=True)
+
+                events_df = pd.DataFrame([
+                    {
+                        "Event ID": e.event_id,
+                        "Type": e.event_type,
+                        "Severity": e.severity,
+                        "Risk Score": e.risk_score,
+                        "Priority": e.metrics.get("priority_score"),
+                        "Confidence": round(e.confidence, 2),
+                        "Track ID": e.track_id,
+                        "Start (s)": round(e.start_time, 2),
+                        "End (s)": round(e.end_time, 2),
+                        "Description": e.description,
+                        "Why": "; ".join(e.risk_factors),
+                    }
+                    for e in assessment.ranked()
+                ])
+                st.dataframe(events_df, use_container_width=True, height=380)
+
+                dl1, dl2 = st.columns(2)
+                with dl1:
+                    st.download_button(
+                        "⬇️ Download Events JSON",
+                        data=json.dumps(assessment.to_dict(), indent=2),
+                        file_name=f"events_{stem}.json",
+                        mime="application/json",
+                    )
+                with dl2:
+                    st.download_button(
+                        "⬇️ Download Events CSV",
+                        data=events_df.to_csv(index=False),
+                        file_name=f"events_{stem}.csv",
+                        mime="text/csv",
+                    )
+            else:
+                st.success("No unsafe handling detected in this clip.")
+
+    with tab_assistant:
+        st.subheader("🤖 Ask WareGuard AI About This Shift (Phase 5)")
+        if assessment is None:
+            st.info("Run the detection pipeline first - the assistant answers "
+                     "questions from the behavior/risk analysis above.")
+        else:
+            context = assessment_to_assistant_context(assessment)
+            shift_assistant = WarehouseAssistant(context)
+
+            if not shift_assistant.client.available:
+                st.caption(
+                    "🔌 Offline mode - no WAREGUARD_LLM_API_KEY / OPENAI_API_KEY set, "
+                    "using the built-in heuristic responder. Answers still cite real "
+                    "event IDs from this shift."
+                )
+
+            history_key = f"chat_history_{stem}"
+            history = st.session_state.setdefault(history_key, [])
+
+            for msg in history:
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+
+            if prompt := st.chat_input("Ask about this shift's safety events..."):
+                history.append({"role": "user", "content": prompt})
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+                with st.chat_message("assistant"):
+                    with st.spinner("Thinking..."):
+                        reply = shift_assistant.ask(prompt)
+                    st.markdown(reply)
+                history.append({"role": "assistant", "content": reply})
 else:
     st.info("Please select or upload a video clip in the sidebar.")
