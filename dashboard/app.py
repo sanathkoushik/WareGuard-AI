@@ -194,10 +194,11 @@ if selected_video_name:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Main Dashboard Tabs
-    tab_video, tab_kinematics, tab_table = st.tabs([
+    tab_video, tab_kinematics, tab_table, tab_events = st.tabs([
         "📹 Video Playback & HUD",
         "📈 Kinematics & Velocity Analytics",
-        "📋 Detections & Trajectory Log"
+        "📋 Detections & Trajectory Log",
+        "🚨 Safety Events & Risk"
     ])
 
     with tab_video:
@@ -292,5 +293,12 @@ if selected_video_name:
                 st.info("Log table is empty.")
         else:
             st.info("No detections log found. Please run the pipeline first.")
+
+    with tab_events:
+        try:
+            from dashboard.events_panel import render_events_tab
+        except ImportError:  # streamlit run puts dashboard/ on sys.path
+            from events_panel import render_events_tab
+        render_events_tab(json_log_path, output_video_path, logs_dir=LOGS_DIR)
 else:
     st.info("Please select or upload a video clip in the sidebar.")
