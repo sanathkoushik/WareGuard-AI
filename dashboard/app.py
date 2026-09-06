@@ -4,11 +4,17 @@ Streamlit-based inspection app for warehouse video intelligence, telemetry, and 
 """
 import os
 import json
+import sys
 from pathlib import Path
 import cv2
 import pandas as pd
 import numpy as np
 import streamlit as st
+
+# `streamlit run` puts this file's own directory (dashboard/) on sys.path,
+# not the project root - so top-level packages (assistant, behavior, risk,
+# detection) resolve only once the root is added explicitly.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from assistant import WarehouseAssistant
 from behavior import BehaviorEngine
