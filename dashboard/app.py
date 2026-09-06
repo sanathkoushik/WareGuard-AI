@@ -4,11 +4,30 @@ Streamlit-based inspection app for warehouse video intelligence, telemetry, and 
 """
 import os
 import json
+import sys
 from pathlib import Path
 import cv2
 import pandas as pd
 import numpy as np
 import streamlit as st
+
+# `streamlit run` puts this file's own directory (dashboard/) on sys.path,
+# not the project root - so top-level packages (assistant, behavior, risk,
+# detection) resolve only once the root is added explicitly.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from assistant import WarehouseAssistant
+from behavior import BehaviorEngine
+from behavior.thresholds import PROFILES
+from risk import RiskEngine
+from risk.export import assessment_to_assistant_context
+
+SEVERITY_COLORS = {
+    "Critical": "#f85149",
+    "High": "#d29922",
+    "Medium": "#58a6ff",
+    "Low": "#3fb950",
+}
 
 # Configure Streamlit page
 st.set_page_config(
@@ -67,6 +86,13 @@ st.markdown("""
         border-radius: 4px;
         border: 1px solid #d29922;
     }
+    .badge-severity {
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-weight: 600;
+        margin-right: 6px;
+        display: inline-block;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -119,6 +145,15 @@ with st.sidebar:
 
     run_button = st.button("▶️ Run Detection Pipeline", type="primary", use_container_width=True)
 
+    st.markdown("---")
+    st.subheader("🧠 Behavior & Risk Profile")
+    threshold_profile = st.selectbox(
+        "Threshold Profile",
+        options=list(PROFILES),
+        index=list(PROFILES).index("default"),
+        help="Sensitive flags more, strict flags fewer - see behavior/thresholds.py",
+    )
+
 if selected_video_name:
     input_video_path = RAW_DIR / selected_video_name
     stem = input_video_path.stem
@@ -152,6 +187,18 @@ if selected_video_name:
             metadata = log_json.get("video_metadata", {})
             summary = log_json.get("summary", {})
             detections_data = log_json.get("detections", [])
+
+    # Phases 2-3: behavior detection + risk scoring, run straight off the
+    # detection log. Standard-library only and cheap, so it's safe to
+    # recompute on every rerun rather than caching (see run_analysis.py).
+    behavior_report = None
+    assessment = None
+    if has_logs:
+        try:
+            behavior_report = BehaviorEngine(thresholds=threshold_profile).analyze_json(json_log_path)
+            assessment = RiskEngine().assess(behavior_report)
+        except Exception as exc:
+            st.sidebar.error(f"Behavior/risk analysis failed: {exc}")
 
     # Top KPI Metrics Row
     kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
