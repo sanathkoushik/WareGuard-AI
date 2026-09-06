@@ -241,12 +241,11 @@ if selected_video_name:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Main Dashboard Tabs
-    tab_video, tab_kinematics, tab_table, tab_safety, tab_assistant = st.tabs([
+    tab_video, tab_kinematics, tab_table, tab_events = st.tabs([
         "📹 Video Playback & HUD",
         "📈 Kinematics & Velocity Analytics",
         "📋 Detections & Trajectory Log",
-        "🚨 Safety Events & Risk",
-        "🤖 Ask the Assistant",
+        "🚨 Safety Events & Risk"
     ])
 
     with tab_video:
@@ -342,116 +341,11 @@ if selected_video_name:
         else:
             st.info("No detections log found. Please run the pipeline first.")
 
-    with tab_safety:
-        st.subheader("🚨 Behavior Detection & Risk Assessment (Phases 2-3)")
-        if assessment is None:
-            st.info("Run the detection pipeline first - behavior and risk analysis "
-                     "run automatically on the resulting log.")
-        else:
-            warning = behavior_report.data_quality_warning()
-            if warning:
-                st.warning(f"⚠️ Data quality: {warning}")
-
-            shift = assessment.summary
-            st.markdown(f"**{shift.headline()}**")
-
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Shift Risk Index", f"{shift.shift_risk_index:.0f}/100", shift.shift_severity)
-            m2.metric("Total Events", shift.total_events)
-            m3.metric("Worst Event", f"{shift.max_risk_score:.0f}/100")
-            m4.metric(
-                "Events / min",
-                f"{shift.events_per_minute:.1f}",
-                "extrapolated" if not shift.rate_is_reliable else None,
-            )
-
-            if shift.total_events:
-                col_type, col_sev = st.columns(2)
-                with col_type:
-                    st.write("**Events by Type**")
-                    st.bar_chart(pd.Series({k: v for k, v in shift.events_by_type.items() if v}))
-                with col_sev:
-                    st.write("**Events by Severity**")
-                    st.bar_chart(pd.Series({k: v for k, v in shift.events_by_severity.items() if v}))
-
-                st.write("**Shift Timeline (30s buckets)**")
-                timeline_df = pd.DataFrame(shift.timeline).set_index("start_s")
-                st.bar_chart(timeline_df[["events", "max_risk"]])
-
-                st.write("**Events (highest priority first)**")
-                legend = " ".join(
-                    f'<span class="badge-severity" style="background-color:{c}22;color:{c};border:1px solid {c};">{s}</span>'
-                    for s, c in SEVERITY_COLORS.items()
-                )
-                st.markdown(legend, unsafe_allow_html=True)
-
-                events_df = pd.DataFrame([
-                    {
-                        "Event ID": e.event_id,
-                        "Type": e.event_type,
-                        "Severity": e.severity,
-                        "Risk Score": e.risk_score,
-                        "Priority": e.metrics.get("priority_score"),
-                        "Confidence": round(e.confidence, 2),
-                        "Track ID": e.track_id,
-                        "Start (s)": round(e.start_time, 2),
-                        "End (s)": round(e.end_time, 2),
-                        "Description": e.description,
-                        "Why": "; ".join(e.risk_factors),
-                    }
-                    for e in assessment.ranked()
-                ])
-                st.dataframe(events_df, use_container_width=True, height=380)
-
-                dl1, dl2 = st.columns(2)
-                with dl1:
-                    st.download_button(
-                        "⬇️ Download Events JSON",
-                        data=json.dumps(assessment.to_dict(), indent=2),
-                        file_name=f"events_{stem}.json",
-                        mime="application/json",
-                    )
-                with dl2:
-                    st.download_button(
-                        "⬇️ Download Events CSV",
-                        data=events_df.to_csv(index=False),
-                        file_name=f"events_{stem}.csv",
-                        mime="text/csv",
-                    )
-            else:
-                st.success("No unsafe handling detected in this clip.")
-
-    with tab_assistant:
-        st.subheader("🤖 Ask WareGuard AI About This Shift (Phase 5)")
-        if assessment is None:
-            st.info("Run the detection pipeline first - the assistant answers "
-                     "questions from the behavior/risk analysis above.")
-        else:
-            context = assessment_to_assistant_context(assessment)
-            shift_assistant = WarehouseAssistant(context)
-
-            if not shift_assistant.client.available:
-                st.caption(
-                    "🔌 Offline mode - no WAREGUARD_LLM_API_KEY / OPENAI_API_KEY set, "
-                    "using the built-in heuristic responder. Answers still cite real "
-                    "event IDs from this shift."
-                )
-
-            history_key = f"chat_history_{stem}"
-            history = st.session_state.setdefault(history_key, [])
-
-            for msg in history:
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
-
-            if prompt := st.chat_input("Ask about this shift's safety events..."):
-                history.append({"role": "user", "content": prompt})
-                with st.chat_message("user"):
-                    st.markdown(prompt)
-                with st.chat_message("assistant"):
-                    with st.spinner("Thinking..."):
-                        reply = shift_assistant.ask(prompt)
-                    st.markdown(reply)
-                history.append({"role": "assistant", "content": reply})
+    with tab_events:
+        try:
+            from dashboard.events_panel import render_events_tab
+        except ImportError:  # streamlit run puts dashboard/ on sys.path
+            from events_panel import render_events_tab
+        render_events_tab(json_log_path, output_video_path, logs_dir=LOGS_DIR)
 else:
     st.info("Please select or upload a video clip in the sidebar.")
