@@ -16,11 +16,9 @@ import streamlit as st
 # detection) resolve only once the root is added explicitly.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from assistant import WarehouseAssistant
 from behavior import BehaviorEngine
 from behavior.thresholds import PROFILES
 from risk import RiskEngine
-from risk.export import assessment_to_assistant_context
 
 SEVERITY_COLORS = {
     "Critical": "#f85149",
@@ -241,11 +239,12 @@ if selected_video_name:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Main Dashboard Tabs
-    tab_video, tab_kinematics, tab_table, tab_events = st.tabs([
+    tab_video, tab_kinematics, tab_table, tab_events, tab_assistant = st.tabs([
         "📹 Video Playback & HUD",
         "📈 Kinematics & Velocity Analytics",
         "📋 Detections & Trajectory Log",
-        "🚨 Safety Events & Risk"
+        "🚨 Safety Events & Risk",
+        "💬 Safety Assistant"
     ])
 
     with tab_video:
@@ -347,5 +346,15 @@ if selected_video_name:
         except ImportError:  # streamlit run puts dashboard/ on sys.path
             from events_panel import render_events_tab
         render_events_tab(json_log_path, output_video_path, logs_dir=LOGS_DIR)
+
+    with tab_assistant:
+        try:
+            from dashboard.assistant_panel import render_assistant_tab
+        except ImportError:  # streamlit run puts dashboard/ on sys.path
+            from assistant_panel import render_assistant_tab
+        render_assistant_tab(
+            assessment=assessment,
+            events_path=LOGS_DIR / f"events_{stem}.json",
+        )
 else:
     st.info("Please select or upload a video clip in the sidebar.")

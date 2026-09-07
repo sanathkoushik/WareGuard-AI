@@ -5,12 +5,31 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import numpy as np
-from detection.tracker import TrajectoryTracker, TrackRecord
-from detection.visualizer import VideoVisualizer
-from utils.log_exporter import export_detections_json, export_detections_csv
+# The Phase 1 pipeline needs the vision stack (numpy, opencv, ultralytics,
+# torch). behavior/, risk/ and assistant/ deliberately do not, so a clean
+# checkout can run most of the suite before `pip install -r requirements.txt`.
+# Importing unconditionally here turns that into a hard collection ERROR for
+# `python -m unittest discover`; skipping instead reports the real situation.
+try:
+    import numpy as np
+    from detection.tracker import TrajectoryTracker, TrackRecord
+    from detection.visualizer import VideoVisualizer
+    from utils.log_exporter import export_detections_json, export_detections_csv
+
+    VISION_STACK_AVAILABLE = True
+    VISION_STACK_ERROR = ""
+except ImportError as exc:
+    VISION_STACK_AVAILABLE = False
+    VISION_STACK_ERROR = str(exc)
+
+requires_vision_stack = unittest.skipUnless(
+    VISION_STACK_AVAILABLE,
+    f"vision stack not installed ({VISION_STACK_ERROR}) - "
+    "run: pip install -r requirements.txt",
+)
 
 
+@requires_vision_stack
 class TestTrajectoryTracker(unittest.TestCase):
     def test_track_kinematics(self):
         tracker = TrajectoryTracker(max_history_per_track=50)
@@ -43,6 +62,7 @@ class TestTrajectoryTracker(unittest.TestCase):
         self.assertAlmostEqual(res1["acceleration_y"], 20.0, places=1)
 
 
+@requires_vision_stack
 class TestVisualizer(unittest.TestCase):
     def test_annotation_render(self):
         vis = VideoVisualizer(fps=30.0, total_frames=100)
@@ -77,6 +97,7 @@ class TestVisualizer(unittest.TestCase):
         self.assertTrue(np.any(annotated > 0)) # Verify annotations were painted
 
 
+@requires_vision_stack
 class TestLogExporters(unittest.TestCase):
     def test_json_and_csv_export(self):
         tmp_dir = Path("data/logs/test_tmp")

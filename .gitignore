@@ -34,3 +34,19 @@ Thumbs.db
 
 # Streamlit secrets
 .streamlit/secrets.toml
+
+# Generated tool output - code-graph analysis caches, not project data.
+# Committed accidentally in PR #3; regenerate locally if the tool is used.
+graphify-out/
+.graphify_*
+graph.json
+graph.html
+
+# Generated analysis artifacts.
+# data/logs/events_sim_demo.json is deliberately committed as the demo
+# fixture the tests and dashboard rely on - everything else regenerates
+# via `python run_analysis.py`.
+data/logs/events_*.json
+!data/logs/events_sim_demo.json
+data/logs/events_*.csv
+!data/logs/events_sim_demo.csv

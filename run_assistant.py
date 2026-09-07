@@ -23,7 +23,11 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from assistant import WarehouseAssistant, load_context_from_events_log
+from assistant import (
+    InvalidEventsLog,
+    WarehouseAssistant,
+    load_context_from_events_log,
+)
 from behavior import BehaviorEngine
 from behavior.simulation import SimConfig, build_demo_scene, build_scenario
 from risk import RiskEngine
@@ -60,8 +64,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         path = Path(args.logs)
         if not path.exists():
             print(f"error: log file not found: {path}", file=sys.stderr)
+            print(f"       generate one with: python run_analysis.py --logs "
+                  f"data/logs/detections_<video>.json", file=sys.stderr)
             return 2
-        context = load_context_from_events_log(path)
+        try:
+            context = load_context_from_events_log(path)
+        except InvalidEventsLog as exc:
+            # A truncated or hand-edited log should tell the operator what is
+            # wrong, not dump a traceback at them mid-shift.
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
 
     assistant = WarehouseAssistant(context)
 

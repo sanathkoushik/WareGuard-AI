@@ -16,12 +16,14 @@ Typical use:
     print(assistant.ask("What was the worst event this shift?"))
 """
 from .client import LLMClient
-from .context import build_context, load_context_from_events_log
-from .qa import WarehouseAssistant
+from .context import InvalidEventsLog, build_context, load_context_from_events_log
+from .qa import WarehouseAssistant, is_grounded
 
 __all__ = [
     "WarehouseAssistant",
     "LLMClient",
     "build_context",
     "load_context_from_events_log",
+    "InvalidEventsLog",
+    "is_grounded",
 ]

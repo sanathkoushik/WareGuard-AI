@@ -15,6 +15,43 @@ from typing import Any, Dict, Optional
 
 _EVENT_ID_RE = re.compile(r"\bevt-?\d+\b", re.IGNORECASE)
 
+# Canonical vocabularies for counting questions. `by_severity` and `by_type` in
+# the context only carry non-zero entries, so a question about a category with
+# no events finds nothing there. Without these lists the answer silently falls
+# through to the shift total - reporting "5 events" for "how many critical?".
+_SEVERITIES = ("Critical", "High", "Medium", "Low")
+
+_TYPE_ALIASES = {
+    "drop": "drop",
+    "dropped": "drop",
+    "fall": "drop",
+    "throw": "throw",
+    "thrown": "throw",
+    "drag": "drag",
+    "dragged": "drag",
+    "improper stack": "improper_stack",
+    "stacking": "improper_stack",
+    "stack": "improper_stack",
+    "rough handling": "rough_handling",
+    "rough": "rough_handling",
+}
+
+
+def _quality_note(context: Dict[str, Any]) -> str:
+    """A coverage caveat to append when the shift was only partly analysable.
+
+    Events reported on a partial analysis are real, but their absence in any
+    period is not evidence that nothing happened. Stating findings without this
+    invites a supervisor to read incomplete coverage as an all-clear.
+    """
+    warning = context.get("shift", {}).get("data_quality_warning")
+    if not warning:
+        return ""
+    return (
+        f"\n\nNote - partial analysis: {warning} "
+        "Absence of an event is not proof that nothing happened."
+    )
+
 
 def _find_event(context: Dict[str, Any], event_id: str) -> Optional[Dict[str, Any]]:
     event_id = event_id.upper()
@@ -50,13 +87,46 @@ def answer(context: Dict[str, Any], question: str) -> str:
         return shift["headline"]
 
     if any(w in q for w in ("how many", "count", "number of")):
-        for event_type, count in shift["by_type"].items():
-            if event_type.replace("_", " ") in q:
-                return f"{count} {event_type.replace('_', ' ')} event(s) this shift."
-        return f"{shift['total_events']} event(s) this shift ({shift['headline']})"
+        # Severity first: "how many critical incidents?" must answer with the
+        # Critical count, not the shift total. `.get(..., 0)` matters because
+        # by_severity omits zero entries, and "0 Low events" is the correct
+        # answer rather than a fall-through to the total.
+        for severity in _SEVERITIES:
+            if severity.lower() in q:
+                count = shift.get("by_severity", {}).get(severity, 0)
+                return (
+                    f"{count} {severity} event(s) this shift."
+                    + _quality_note(context)
+                )
+
+        for alias, event_type in _TYPE_ALIASES.items():
+            if alias in q:
+                count = shift.get("by_type", {}).get(event_type, 0)
+                return (
+                    f"{count} {event_type.replace('_', ' ')} event(s) this shift."
+                    + _quality_note(context)
+                )
+
+        return (
+            f"{shift['total_events']} event(s) this shift ({shift['headline']})"
+            + _quality_note(context)
+        )
+
+    if any(w in q for w in ("what type", "what kind", "types of", "kinds of",
+                            "what behaviour", "what behavior", "breakdown")):
+        by_type = shift.get("by_type", {})
+        if not by_type:
+            return "No unsafe handling types were recorded this shift."
+        parts = ", ".join(
+            f"{t.replace('_', ' ')} x{n}" for t, n in by_type.items()
+        )
+        return (
+            f"Unsafe handling types this shift: {parts}."
+            + _quality_note(context)
+        )
 
     if any(w in q for w in ("worst", "critical", "most severe", "highest risk", "top")):
-        return f"Worst event: {_format_event(events[0])}"
+        return f"Worst event: {_format_event(events[0])}" + _quality_note(context)
 
     if "repeat" in q or "offend" in q:
         tracks = shift["repeat_offender_tracks"]
@@ -70,11 +140,11 @@ def answer(context: Dict[str, Any], question: str) -> str:
         return "No data quality issues reported for this shift."
 
     if any(w in q for w in ("summary", "overview", "headline", "how was", "how did")):
-        return shift["headline"]
+        return shift["headline"] + _quality_note(context)
 
     # Default: headline plus the top 3 events, same priority order the
     # dashboard would rank them in.
     lines = [shift["headline"]]
     for e in events[:3]:
         lines.append(f"  - {_format_event(e)}")
-    return "\n".join(lines)
+    return "\n".join(lines) + _quality_note(context)
