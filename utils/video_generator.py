@@ -8,9 +8,14 @@ Simulates key warehouse handling events:
   4. Worker normal carrying
 """
 import math
+import sys
+from pathlib import Path
+
 import cv2
 import numpy as np
-from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import DEFAULT_FPS, OUTPUT_CODEC
 
 
 def draw_warehouse_background(frame: np.ndarray, width: int, height: int):
@@ -100,7 +105,7 @@ def draw_cardboard_box(frame: np.ndarray, x: int, y: int, w: int = 70, h: int = 
 
 def generate_sample_warehouse_video(
     output_path: str = "data/raw_videos/sample_warehouse.mp4",
-    fps: int = 30,
+    fps: int = DEFAULT_FPS,
     duration_sec: int = 10,
     width: int = 1280,
     height: int = 720
@@ -115,7 +120,7 @@ def generate_sample_warehouse_video(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    fourcc = cv2.VideoWriter_fourcc(*OUTPUT_CODEC)
     out = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
 
     total_frames = fps * duration_sec

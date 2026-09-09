@@ -78,19 +78,23 @@ def main():
     print(f" Render Video    : {not args.no_video}")
     print("--------------------------------------------------")
 
-    pipeline = DetectionPipeline(
-        model_path=args.model,
-        conf_threshold=args.conf,
-        tracker=args.tracker
-    )
+    try:
+        pipeline = DetectionPipeline(
+            model_path=args.model,
+            conf_threshold=args.conf,
+            tracker=args.tracker
+        )
 
-    result = pipeline.process_video(
-        input_video_path=args.input,
-        output_video_path=args.output,
-        save_json=not args.no_json,
-        save_csv=not args.no_csv,
-        render_video=not args.no_video
-    )
+        result = pipeline.process_video(
+            input_video_path=args.input,
+            output_video_path=args.output,
+            save_json=not args.no_json,
+            save_csv=not args.no_csv,
+            render_video=not args.no_video
+        )
+    except Exception as exc:
+        print(f"[ERROR] Detection pipeline failed: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     print("==================================================")
     print("             🎉 PROCESSING COMPLETED              ")

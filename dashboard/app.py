@@ -22,6 +22,11 @@ from behavior.thresholds import PROFILES
 from risk import RiskEngine
 from risk.export import assessment_to_assistant_context
 
+try:  # streamlit run puts dashboard/ on sys.path, not the repo root
+    from dashboard.events_panel import render_events_tab, SEEK_FRAME_KEY, SEEK_TIME_KEY
+except ImportError:
+    from events_panel import render_events_tab, SEEK_FRAME_KEY, SEEK_TIME_KEY
+
 SEVERITY_COLORS = {
     "Critical": "#f85149",
     "High": "#d29922",
@@ -164,16 +169,23 @@ if selected_video_name:
     # If user clicked Run Detection Pipeline
     if run_button:
         with st.spinner("Processing video with YOLOv8 & ByteTrack..."):
-            from detection.pipeline import DetectionPipeline
-            pipeline = DetectionPipeline(model_path=model_choice, conf_threshold=conf_thresh)
-            result = pipeline.process_video(
-                input_video_path=input_video_path,
-                output_video_path=output_video_path,
-                save_json=True,
-                save_csv=True,
-                render_video=True
-            )
-            st.success("✅ Detection pipeline completed successfully!")
+            try:
+                from detection.pipeline import DetectionPipeline
+                pipeline = DetectionPipeline(model_path=model_choice, conf_threshold=conf_thresh)
+                result = pipeline.process_video(
+                    input_video_path=input_video_path,
+                    output_video_path=output_video_path,
+                    save_json=True,
+                    save_csv=True,
+                    render_video=True
+                )
+                st.success("✅ Detection pipeline completed successfully!")
+            except Exception as exc:
+                st.error(
+                    f"❌ Detection pipeline failed: {exc}\n\n"
+                    "Common causes: the model weights couldn't be downloaded "
+                    "(no network on first run) or the video file is corrupt/unreadable."
+                )
 
     # Check if processed logs exist
     has_logs = json_log_path.exists()
@@ -241,11 +253,12 @@ if selected_video_name:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Main Dashboard Tabs
-    tab_video, tab_kinematics, tab_table, tab_events = st.tabs([
+    tab_video, tab_kinematics, tab_table, tab_events, tab_assistant = st.tabs([
         "📹 Video Playback & HUD",
         "📈 Kinematics & Velocity Analytics",
         "📋 Detections & Trajectory Log",
-        "🚨 Safety Events & Risk"
+        "🚨 Safety Events & Risk",
+        "🤖 AI Assistant"
     ])
 
     with tab_video:
@@ -272,13 +285,26 @@ if selected_video_name:
             st.subheader("🔍 Interactive Frame Scrubber")
             cap = cv2.VideoCapture(str(output_video_path))
             total_f = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            video_fps = metadata.get("fps") or cap.get(cv2.CAP_PROP_FPS) or 30.0
             if total_f > 0:
-                frame_slider = st.slider("Select Frame Index", min_value=0, max_value=total_f - 1, value=50, step=1)
+                # A "Jump to this event" click on the Safety Events tab writes
+                # SEEK_FRAME_KEY into session state; apply it to the slider's
+                # own state before the widget is created so it actually moves.
+                frame_slider_key = "wg_frame_slider"
+                seek_frame = st.session_state.pop(SEEK_FRAME_KEY, None)
+                st.session_state.pop(SEEK_TIME_KEY, None)
+                if seek_frame is not None:
+                    st.session_state[frame_slider_key] = max(0, min(int(seek_frame), total_f - 1))
+
+                slider_kwargs = dict(min_value=0, max_value=total_f - 1, step=1, key=frame_slider_key)
+                if frame_slider_key not in st.session_state:
+                    slider_kwargs["value"] = 50
+                frame_slider = st.slider("Select Frame Index", **slider_kwargs)
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_slider)
                 ret, frame_img = cap.read()
                 if ret:
                     frame_rgb = cv2.cvtColor(frame_img, cv2.COLOR_BGR2RGB)
-                    st.image(frame_rgb, caption=f"Frame #{frame_slider} (t = {frame_slider/30.0:.2f}s)", use_container_width=True)
+                    st.image(frame_rgb, caption=f"Frame #{frame_slider} (t = {frame_slider/video_fps:.2f}s)", use_container_width=True)
             cap.release()
 
     with tab_kinematics:
@@ -342,10 +368,44 @@ if selected_video_name:
             st.info("No detections log found. Please run the pipeline first.")
 
     with tab_events:
-        try:
-            from dashboard.events_panel import render_events_tab
-        except ImportError:  # streamlit run puts dashboard/ on sys.path
-            from events_panel import render_events_tab
         render_events_tab(json_log_path, output_video_path, logs_dir=LOGS_DIR)
+
+    with tab_assistant:
+        st.subheader("🤖 Ask the AI Assistant")
+        st.caption(
+            "Ask a question about this shift — e.g. \"What was the worst "
+            "event?\" or \"Any repeat offenders?\""
+        )
+
+        if assessment is None:
+            st.info(
+                "Run the detection pipeline and confirm behavior/risk analysis "
+                "succeeded (see the sidebar) to enable the assistant."
+            )
+        else:
+            assistant = WarehouseAssistant(assessment_to_assistant_context(assessment))
+            if assistant.client.available:
+                st.caption(f"🧠 Answering with LLM model `{assistant.client.model}`.")
+            else:
+                st.caption(
+                    "⚙️ No LLM configured (set `WAREGUARD_LLM_API_KEY` or "
+                    "`OPENAI_API_KEY`) — answering with the built-in heuristic responder."
+                )
+
+            chat_key = f"wg_chat_{stem}"
+            if chat_key not in st.session_state:
+                st.session_state[chat_key] = []
+
+            for role, text in st.session_state[chat_key]:
+                with st.chat_message(role):
+                    st.markdown(text)
+
+            question = st.chat_input("Ask about this shift...")
+            if question:
+                st.session_state[chat_key].append(("user", question))
+                with st.spinner("Thinking..."):
+                    answer = assistant.ask(question)
+                st.session_state[chat_key].append(("assistant", answer))
+                st.rerun()
 else:
     st.info("Please select or upload a video clip in the sidebar.")

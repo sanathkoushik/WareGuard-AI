@@ -12,8 +12,9 @@ renders - it never re-derives a threshold, a score or a severity. If a figure
 looks wrong, the bug is in Phase 2/3, not here.
 
 **It opens no video.** Event cards expose `start_frame` / `start_time` and write
-a requested seek into `st.session_state`; the existing scrubber in `app.py`
-(L222-234) remains the only thing that touches OpenCV.
+a requested seek into `st.session_state[SEEK_FRAME_KEY]`; the frame scrubber in
+`app.py`'s "Video Playback & HUD" tab reads that key and remains the only
+thing that touches OpenCV.
 
 **It adds no dependencies.** Streamlit only - no pandas, no plotly, no numpy.
 Charts are fed plain dicts and lists, which `st.bar_chart` accepts.
@@ -689,10 +690,9 @@ def render_event_card(
                 if start_t is not None:
                     st.session_state[SEEK_TIME_KEY] = float(start_t)
                 st.info(
-                    f"Seek requested at **frame {int(start_frame)}** "
+                    f"Frame scrubber moved to **frame {int(start_frame)}** "
                     f"({time_txt.split('–')[0].strip()}). Open the "
-                    f"**Video Playback & HUD** tab and set the frame scrubber "
-                    f"to {int(start_frame)}."
+                    f"**Video Playback & HUD** tab to view it."
                 )
 
 
