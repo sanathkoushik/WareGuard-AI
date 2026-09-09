@@ -20,7 +20,9 @@ from config import (
     IOU_THRESHOLD,
     DEFAULT_TRACKER,
     PROCESSED_VIDEOS_DIR,
-    LOGS_DIR
+    LOGS_DIR,
+    DEFAULT_FPS,
+    OUTPUT_CODEC
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -83,7 +85,7 @@ class DetectionPipeline:
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = cap.get(cv2.CAP_PROP_FPS)
         if fps <= 0 or fps != fps: # Check for NaN or 0
-            fps = 30.0
+            fps = DEFAULT_FPS
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration_sec = total_frames / fps if fps > 0 else 0.0
 
@@ -92,7 +94,7 @@ class DetectionPipeline:
         # Prepare Video Writer if rendering video
         writer = None
         if render_video:
-            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            fourcc = cv2.VideoWriter_fourcc(*OUTPUT_CODEC)
             writer = cv2.VideoWriter(str(output_video_path), fourcc, fps, (width, height))
 
         visualizer = VideoVisualizer(fps=fps, total_frames=total_frames)

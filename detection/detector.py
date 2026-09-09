@@ -32,7 +32,15 @@ class YOLOTracker:
         self._next_fallback_id = 9000
 
         logger.info(f"Loading YOLO model from: {model_path}")
-        self.model = YOLO(model_path)
+        try:
+            self.model = YOLO(model_path)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to load YOLO model '{model_path}'. If this is a "
+                "stock Ultralytics weights file (e.g. yolov8n.pt) that isn't "
+                "present locally, Ultralytics downloads it on first use - "
+                f"check network connectivity. Original error: {exc}"
+            ) from exc
         logger.info("YOLO model loaded successfully.")
 
     def detect_and_track(
