@@ -13,6 +13,8 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Optional
 
+from behavior.detectors import RECOMMENDED_ACTIONS
+
 _EVENT_ID_RE = re.compile(r"\bevt-?\d+\b", re.IGNORECASE)
 
 
@@ -26,11 +28,15 @@ def _find_event(context: Dict[str, Any], event_id: str) -> Optional[Dict[str, An
 
 def _format_event(e: Dict[str, Any]) -> str:
     reasons = "; ".join(e["why_this_score"]) if e["why_this_score"] else "no listed factors"
-    return (
+    line = (
         f"{e['id']} [{e['severity']}] {e['type']} at {e['at']} "
         f"(risk {e['risk_score']}, confidence {e['confidence']}): "
         f"{e['what_happened']} Why: {reasons}"
     )
+    action = e.get("recommended_action")
+    if action:
+        line += f" Recommended action: {action}"
+    return line
 
 
 def answer(context: Dict[str, Any], question: str) -> str:
@@ -63,6 +69,20 @@ def answer(context: Dict[str, Any], question: str) -> str:
         if not tracks:
             return "No repeat offenders this shift - every flagged load appears once."
         return f"Repeat-offender track ID(s): {', '.join(str(t) for t in tracks)}."
+
+    if any(w in q for w in ("recommend", "should", "corrective", "prevent", "fix", "avoid")):
+        for event_type, action in RECOMMENDED_ACTIONS.items():
+            if event_type.replace("_", " ") in q:
+                return f"Recommended action for {event_type.replace('_', ' ')}: {action}"
+        types_present = [t for t in shift["by_type"] if shift["by_type"].get(t)]
+        if types_present:
+            lines = [f"Recommended actions for this shift's events:"]
+            for t in types_present:
+                action = RECOMMENDED_ACTIONS.get(t)
+                if action:
+                    lines.append(f"  - {t.replace('_', ' ')}: {action}")
+            return "\n".join(lines)
+        return shift["headline"]
 
     if "quality" in q or "reliable" in q or "trust" in q:
         if shift["data_quality_warning"]:

@@ -1,0 +1,2 @@
+event_id,event_type,severity,risk_score,priority_score,confidence,track_id,class_name,start_frame,end_frame,start_time,end_time,duration_seconds,related_track_ids,risk_factors,description
+EVT-0001,rough_handling,High,58.0,48.9,0.843,31,cargo,133,141,4.433,4.7,0.267,17|30|32,rough handling baseline (+34); jerk 43 h/s^2 (+16); peak 8.3 h/s (+8),cargo #31 handled abruptly (jerk 43.3 h/s^2) with a worker 1.3 box-heights away

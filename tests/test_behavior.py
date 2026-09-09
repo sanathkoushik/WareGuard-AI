@@ -267,9 +267,13 @@ class TestDataQualityHonesty(unittest.TestCase):
         self.assertIn("usable", warning)
 
     def test_no_cargo_class_is_called_out(self):
+        # is_cargo treats any non-person track as cargo (yolov8n has no
+        # carton/pallet class, so name-matching alone misses real footage -
+        # see behavior/schema.py). "No cargo" now only happens when every
+        # track in the scene is a person.
         rows = [{
             "frame": f, "timestamp": f / 30.0, "track_id": 1,
-            "class_name": "traffic light", "confidence": 0.8,
+            "class_name": "person", "confidence": 0.8,
             "bbox": (10.0, 10.0, 40.0, 60.0),
         } for f in range(20)]
         report = BehaviorEngine().analyze(tracks_from_rows(rows), SceneContext())

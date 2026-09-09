@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+from behavior.detectors import RECOMMENDED_ACTIONS
 from risk.engine import ShiftSummary
 
 
@@ -29,6 +30,7 @@ def _event_to_context(e: Dict[str, Any]) -> Dict[str, Any]:
         "track_id": e.get("track_id"),
         "what_happened": e.get("description", ""),
         "why_this_score": e.get("risk_factors", []),
+        "recommended_action": RECOMMENDED_ACTIONS.get(e.get("event_type")),
     }
 
 

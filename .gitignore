@@ -34,3 +34,17 @@ Thumbs.db
 
 # Streamlit secrets
 .streamlit/secrets.toml
+
+# Large video assets - GitHub hard-blocks anything over 100MB, and these
+# bloat the repo well before that. Keep the small synthetic demo clip
+# (data/raw_videos/sample_warehouse.mp4) tracked; everything else here is
+# real footage or a rendered annotation, regenerable from run_detection.py.
+data/raw_videos/*.mp4
+!data/raw_videos/sample_warehouse.mp4
+data/raw_videos/*.avi
+data/raw_videos/*.mov
+data/processed_videos/*.mp4
+data/processed_videos/*.avi
+data/processed_videos/*.mov
+*.zip
+Mumbai branch*/

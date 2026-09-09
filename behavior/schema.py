@@ -27,6 +27,13 @@ CARGO_CLASSES = {
 }
 PERSON_CLASSES = {"person", "worker"}
 
+# yolov8n is COCO-pretrained and has no "carton"/"pallet"/"mattress" class, so
+# real warehouse footage rarely matches CARGO_CLASSES by name. Any tracked
+# object that isn't a person is treated as handled material - this trades
+# label precision for recall, which is the right side to err on for a
+# behavior-detection prototype (a missed CARGO_CLASSES name must never look
+# like "no cargo in the scene").
+
 
 @dataclass
 class TrackPoint:
@@ -135,7 +142,8 @@ class Track:
 
     @property
     def is_cargo(self) -> bool:
-        return self.class_name.lower() in CARGO_CLASSES
+        name = self.class_name.lower()
+        return name in CARGO_CLASSES or name not in PERSON_CLASSES
 
     @property
     def is_person(self) -> bool:
@@ -320,6 +328,15 @@ def tracks_from_rows(rows: Iterable[Dict[str, Any]]) -> List[Track]:
             )
 
         class_name = str(row.get("class_name", "unknown"))
+        # yolov8n reports raw COCO names (e.g. "car", "bed", "chair") for
+        # anything that isn't a known cargo alias - is_cargo already treats
+        # any non-person track as handled material, but the raw COCO label
+        # leaking into event descriptions ("car #31 handled abruptly") reads
+        # as a detector error rather than an unlabeled-cargo tradeoff. Show a
+        # neutral name instead of a wrong-sounding specific one.
+        lname = class_name.lower()
+        if lname not in PERSON_CLASSES and lname not in CARGO_CLASSES:
+            class_name = "cargo"
         point = TrackPoint(
             frame=int(row.get("frame", 0)),
             timestamp=float(row.get("timestamp", 0.0)),
