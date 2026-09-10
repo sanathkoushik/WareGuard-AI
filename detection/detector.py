@@ -43,6 +43,15 @@ class YOLOTracker:
             ) from exc
         logger.info("YOLO model loaded successfully.")
 
+    def reset_tracking(self) -> None:
+        """Clear ByteTrack's persisted state so a new video starts with fresh
+        track IDs instead of continuing IDs/trajectories left over from a
+        previous `process_video()` call on a reused instance."""
+        predictor = getattr(self.model, "predictor", None)
+        if predictor is not None and hasattr(predictor, "trackers"):
+            predictor.trackers = []
+        self._next_fallback_id = 9000
+
     def detect_and_track(
         self,
         frame: np.ndarray,

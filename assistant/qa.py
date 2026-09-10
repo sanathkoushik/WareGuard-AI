@@ -31,9 +31,17 @@ class WarehouseAssistant:
     def __init__(self, context: Dict[str, Any], client: Optional[LLMClient] = None):
         self.context = context
         self.client = client if client is not None else LLMClient()
+        # Set by ask() so a caller (e.g. the dashboard) can show the *actual*
+        # outcome of the last call rather than just whether a key is present -
+        # a bad key or a down API must not be reported as "using the LLM".
+        # One of "unconfigured" | "llm" | "fallback".
+        self.last_source: str = "unconfigured"
+        self.last_error: Optional[str] = None
 
     def ask(self, question: str) -> str:
         if not self.client.available:
+            self.last_source = "unconfigured"
+            self.last_error = None
             return heuristic.answer(self.context, question)
 
         user_prompt = (
@@ -41,10 +49,16 @@ class WarehouseAssistant:
             f"Question: {question}"
         )
         try:
-            return self.client.complete(SYSTEM_PROMPT, user_prompt)
-        except Exception:
+            answer = self.client.complete(SYSTEM_PROMPT, user_prompt)
+            self.last_source = "llm"
+            self.last_error = None
+            return answer
+        except Exception as exc:
             # Covers a missing `requests` install, network/API failures, and
             # malformed responses alike - none of them may take a
             # supervisor-facing assistant fully offline. Degrade to the
-            # heuristic responder instead of raising into the caller.
+            # heuristic responder instead of raising into the caller, but
+            # record why so the UI can say so truthfully.
+            self.last_source = "fallback"
+            self.last_error = str(exc)
             return heuristic.answer(self.context, question)

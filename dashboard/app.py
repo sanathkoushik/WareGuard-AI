@@ -5,6 +5,7 @@ Streamlit-based inspection app for warehouse video intelligence, telemetry, and 
 import os
 import json
 import sys
+import time
 from pathlib import Path
 import cv2
 import pandas as pd
@@ -26,6 +27,11 @@ try:  # streamlit run puts dashboard/ on sys.path, not the repo root
     from dashboard.events_panel import render_events_tab, SEEK_FRAME_KEY, SEEK_TIME_KEY
 except ImportError:
     from events_panel import render_events_tab, SEEK_FRAME_KEY, SEEK_TIME_KEY
+
+try:
+    from dashboard.fleet_panel import render_fleet_tab
+except ImportError:
+    from fleet_panel import render_fleet_tab
 
 SEVERITY_COLORS = {
     "Critical": "#f85149",
@@ -116,18 +122,50 @@ st.markdown('<div class="main-header">🛡️ WareGuard AI — Warehouse Video I
 st.markdown('<div class="sub-header">Automated object detection, multi-object tracking, and kinematic analysis for warehouse safety.</div>', unsafe_allow_html=True)
 
 # Sidebar: Video Selection & Pipeline Runner
+VIDEO_SELECT_KEY = "wg_video_select"
+PENDING_SELECT_KEY = "wg_pending_video_select"
+AUTO_RUN_KEY = "wg_auto_run"
+
 with st.sidebar:
     st.header("⚙️ Video Selection & Config")
 
     raw_files = list(RAW_DIR.glob("*.mp4")) + list(RAW_DIR.glob("*.avi")) + list(RAW_DIR.glob("*.mov"))
-    video_options = [f.name for f in raw_files]
+    video_stems = {f.stem for f in raw_files}
 
-    selected_video_name = None
+    # display label -> {"stem": ..., "filename": ... or None}
+    video_choices = {f.name: {"stem": f.stem, "filename": f.name} for f in raw_files}
+
+    # Some committed detection logs (real footage, scored in advance) have no
+    # matching video file - large raw clips aren't checked into git (see
+    # .gitignore). Surface them too so that demo data isn't invisible after a
+    # fresh clone; the video tabs below already degrade gracefully when the
+    # source file is missing, showing analysis from the saved log alone.
+    log_only_stems = sorted(
+        p.stem[len("detections_"):]
+        for p in LOGS_DIR.glob("detections_*.json")
+        if p.stem[len("detections_"):] not in video_stems
+    )
+    for stem in log_only_stems:
+        video_choices[f"{stem}  (log only — source video not included)"] = {
+            "stem": stem, "filename": None
+        }
+
+    video_options = list(video_choices.keys())
+
+    # A webcam capture or upload completed on the previous run wants this
+    # dropdown to open pre-selected on it - written into session state before
+    # the widget is created, same pattern the "jump to event" seek uses.
+    pending = st.session_state.pop(PENDING_SELECT_KEY, None)
+    if pending and pending in video_choices:
+        st.session_state[VIDEO_SELECT_KEY] = pending
+
+    selected_label = None
     if video_options:
-        selected_video_name = st.selectbox(
+        selected_label = st.selectbox(
             "Select Available Video",
             options=video_options,
-            index=0
+            index=0,
+            key=VIDEO_SELECT_KEY,
         )
     else:
         st.warning("No video files found in `data/raw_videos`.")
@@ -141,7 +179,50 @@ with st.sidebar:
         with open(save_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         st.success(f"Saved: {uploaded_file.name}")
-        selected_video_name = uploaded_file.name
+        video_choices[uploaded_file.name] = {"stem": Path(uploaded_file.name).stem, "filename": uploaded_file.name}
+        selected_label = uploaded_file.name
+
+    st.markdown("---")
+    st.subheader("📷 Live Camera Capture")
+    st.caption("Record straight from a webcam attached to this machine — no pre-recorded footage needed.")
+    cam_index = st.number_input("Camera index", min_value=0, max_value=4, value=0, step=1)
+    cam_duration = st.slider("Recording length (seconds)", min_value=3, max_value=30, value=8)
+    capture_button = st.button("🔴 Record from Webcam", use_container_width=True)
+
+    if capture_button:
+        from utils.webcam_capture import record_webcam_clip
+        capture_filename = f"webcam_{time.strftime('%Y%m%d_%H%M%S')}.mp4"
+        capture_path = RAW_DIR / capture_filename
+        preview_slot = st.empty()
+        try:
+            def _on_frame(frame_bgr, elapsed, duration):
+                preview_slot.image(
+                    cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB),
+                    caption=f"Recording… {elapsed:.1f}/{duration:.0f}s",
+                    use_container_width=True,
+                )
+
+            record_webcam_clip(
+                capture_path,
+                duration_s=float(cam_duration),
+                camera_index=int(cam_index),
+                on_frame=_on_frame,
+            )
+            preview_slot.empty()
+            st.success(f"✅ Captured {cam_duration}s clip: {capture_filename}")
+            # Pre-select it and immediately run detection on rerun - "point
+            # webcam, click record, see it flagged" in one motion.
+            st.session_state[PENDING_SELECT_KEY] = capture_filename
+            st.session_state[AUTO_RUN_KEY] = True
+            st.rerun()
+        except Exception as exc:
+            preview_slot.empty()
+            st.error(
+                f"❌ Webcam capture failed: {exc}\n\n"
+                "Common causes: no webcam attached, it's in use by another "
+                "application, or this environment has no camera at all "
+                "(e.g. a headless server)."
+            )
 
     st.markdown("---")
     st.subheader("🚀 Pipeline Settings")
@@ -159,33 +240,44 @@ with st.sidebar:
         help="Sensitive flags more, strict flags fewer - see behavior/thresholds.py",
     )
 
-if selected_video_name:
-    input_video_path = RAW_DIR / selected_video_name
-    stem = input_video_path.stem
+st.markdown("---")
+with st.expander("🏆 Cross-Shift Leaderboard — riskiest shifts across all analyzed footage", expanded=False):
+    render_fleet_tab(LOGS_DIR, profile=threshold_profile)
+st.markdown("---")
+
+if selected_label:
+    entry = video_choices[selected_label]
+    stem = entry["stem"]
+    input_video_path = RAW_DIR / (entry["filename"] or f"{stem}.mp4")
+    has_source_video = entry["filename"] is not None
     output_video_path = PROCESSED_DIR / f"annotated_{stem}.mp4"
     json_log_path = LOGS_DIR / f"detections_{stem}.json"
     csv_log_path = LOGS_DIR / f"detections_{stem}.csv"
 
-    # If user clicked Run Detection Pipeline
-    if run_button:
-        with st.spinner("Processing video with YOLOv8 & ByteTrack..."):
-            try:
-                from detection.pipeline import DetectionPipeline
-                pipeline = DetectionPipeline(model_path=model_choice, conf_threshold=conf_thresh)
-                result = pipeline.process_video(
-                    input_video_path=input_video_path,
-                    output_video_path=output_video_path,
-                    save_json=True,
-                    save_csv=True,
-                    render_video=True
-                )
-                st.success("✅ Detection pipeline completed successfully!")
-            except Exception as exc:
-                st.error(
-                    f"❌ Detection pipeline failed: {exc}\n\n"
-                    "Common causes: the model weights couldn't be downloaded "
-                    "(no network on first run) or the video file is corrupt/unreadable."
-                )
+    # If user clicked Run Detection Pipeline (directly, or via an
+    # auto-triggered run right after a webcam capture)
+    if run_button or st.session_state.pop(AUTO_RUN_KEY, False):
+        if not has_source_video:
+            st.sidebar.error("Selected entry has no source video to process.")
+        else:
+            with st.spinner("Processing video with YOLOv8 & ByteTrack..."):
+                try:
+                    from detection.pipeline import DetectionPipeline
+                    pipeline = DetectionPipeline(model_path=model_choice, conf_threshold=conf_thresh)
+                    result = pipeline.process_video(
+                        input_video_path=input_video_path,
+                        output_video_path=output_video_path,
+                        save_json=True,
+                        save_csv=True,
+                        render_video=True
+                    )
+                    st.success("✅ Detection pipeline completed successfully!")
+                except Exception as exc:
+                    st.error(
+                        f"❌ Detection pipeline failed: {exc}\n\n"
+                        "Common causes: the model weights couldn't be downloaded "
+                        "(no network on first run) or the video file is corrupt/unreadable."
+                    )
 
     # Check if processed logs exist
     has_logs = json_log_path.exists()
@@ -211,6 +303,38 @@ if selected_video_name:
             assessment = RiskEngine().assess(behavior_report)
         except Exception as exc:
             st.sidebar.error(f"Behavior/risk analysis failed: {exc}")
+
+    # Proactive alerting: a supervisor shouldn't have to open the Safety
+    # Events tab to learn a shift had a critical incident. Toast once per
+    # event (tracked per-video in session state so a rerun doesn't re-fire
+    # the same toast), and keep a persistent banner up for the whole shift.
+    if assessment is not None:
+        critical_events = [e for e in assessment.events if e.severity == "Critical"]
+        high_events = [e for e in assessment.events if e.severity == "High"]
+
+        alerted_key = f"wg_alerted_{stem}"
+        if alerted_key not in st.session_state:
+            st.session_state[alerted_key] = set()
+        for e in critical_events:
+            eid = e.event_id or f"trk{e.track_id}"
+            if eid not in st.session_state[alerted_key]:
+                st.toast(f"Critical: {e.description}", icon="🚨")
+                st.session_state[alerted_key].add(eid)
+
+        if critical_events:
+            st.error(
+                f"🚨 **{len(critical_events)} critical safety event"
+                f"{'s' if len(critical_events) != 1 else ''} detected in this shift.** "
+                "See the **Safety Events & Risk** tab for details.",
+                icon="🚨",
+            )
+        elif high_events:
+            st.warning(
+                f"⚠️ **{len(high_events)} high-severity event"
+                f"{'s' if len(high_events) != 1 else ''} detected in this shift.** "
+                "See the **Safety Events & Risk** tab for details.",
+                icon="⚠️",
+            )
 
     # Top KPI Metrics Row
     kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
@@ -298,7 +422,7 @@ if selected_video_name:
 
                 slider_kwargs = dict(min_value=0, max_value=total_f - 1, step=1, key=frame_slider_key)
                 if frame_slider_key not in st.session_state:
-                    slider_kwargs["value"] = 50
+                    slider_kwargs["value"] = min(50, total_f - 1)
                 frame_slider = st.slider("Select Frame Index", **slider_kwargs)
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_slider)
                 ret, frame_img = cap.read()
@@ -384,12 +508,31 @@ if selected_video_name:
             )
         else:
             assistant = WarehouseAssistant(assessment_to_assistant_context(assessment))
-            if assistant.client.available:
-                st.caption(f"🧠 Answering with LLM model `{assistant.client.model}`.")
-            else:
+
+            # A fresh WarehouseAssistant is constructed every rerun, so its
+            # last_source/last_error defaults reset each time - the true
+            # outcome of the last *actual* call has to be persisted in
+            # session state (per shift) to survive the rerun below.
+            status_key = f"wg_llm_status_{stem}"
+            status = st.session_state.get(status_key, {"source": "unconfigured", "error": None})
+
+            if not assistant.client.available:
                 st.caption(
                     "⚙️ No LLM configured (set `WAREGUARD_LLM_API_KEY` or "
-                    "`OPENAI_API_KEY`) — answering with the built-in heuristic responder."
+                    "`OPENAI_API_KEY`, optionally via a `.env` file) — answering "
+                    "with the built-in heuristic responder."
+                )
+            elif status["source"] == "llm":
+                st.caption(f"🧠 Answering with LLM model `{assistant.client.model}` — last call succeeded.")
+            elif status["source"] == "fallback":
+                st.caption(
+                    f"⚠️ LLM call failed ({status['error']}) — falling back to the "
+                    f"heuristic responder. Model configured: `{assistant.client.model}`."
+                )
+            else:
+                st.caption(
+                    f"🧠 LLM configured (`{assistant.client.model}`) — ask a "
+                    "question to confirm it responds."
                 )
 
             chat_key = f"wg_chat_{stem}"
@@ -405,6 +548,7 @@ if selected_video_name:
                 st.session_state[chat_key].append(("user", question))
                 with st.spinner("Thinking..."):
                     answer = assistant.ask(question)
+                st.session_state[status_key] = {"source": assistant.last_source, "error": assistant.last_error}
                 st.session_state[chat_key].append(("assistant", answer))
                 st.rerun()
 else:

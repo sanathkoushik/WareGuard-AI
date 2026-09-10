@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.git/
+.venv/
+venv/
+.pytest_cache/
+graphify-out/
+docs/demo_video.mp4
+docs/_video_frames/
+data/processed_videos/*.mp4
+*.pptx
+*.docx
