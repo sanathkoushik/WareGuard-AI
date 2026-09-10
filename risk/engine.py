@@ -241,8 +241,15 @@ class RiskEngine:
         duration = duration_seconds
         if duration is None:
             duration = getattr(report.context, "duration_seconds", None)
+        # When neither the caller nor the scene context knows the real
+        # footage length, the last resort is the last event's end time - but
+        # that is a lower bound, not the duration: any quiet footage after
+        # the last event is invisible to it. Treat the resulting rate as
+        # unreliable rather than let a guessed duration inflate events/min.
+        duration_estimated = False
         if not duration or duration <= 0:
             duration = max((e.end_time for e in events), default=0.0)
+            duration_estimated = True
         duration = max(duration, 1e-6)
 
         by_type = {t: 0 for t in ALL_EVENT_TYPES}
@@ -300,7 +307,7 @@ class RiskEngine:
             shift_risk_index=index,
             shift_severity=shift_severity,
             events_per_minute=epm,
-            rate_is_reliable=rate_confidence >= 1.0,
+            rate_is_reliable=rate_confidence >= 1.0 and not duration_estimated,
             repeat_offender_tracks=repeat_tracks,
             top_events=[
                 f"{e.event_id} {e.severity} {e.risk_score:.0f} - {e.description}"

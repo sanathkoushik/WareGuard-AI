@@ -123,7 +123,11 @@ class TrackRecord:
             "end_time": self.timestamps[-1],
             "duration_frames": len(self.frames),
             "max_speed": max(self.speeds) if self.speeds else 0.0,
-            "max_vertical_accel": max(self.vertical_accelerations) if self.vertical_accelerations else 0.0,
+            # abs() because +y is down: a hard impact shows up as a large
+            # *negative* acceleration (sudden deceleration on landing), and a
+            # plain max() over signed values would report the peak downward
+            # acceleration during the fall instead of the impact spike.
+            "max_vertical_accel": max((abs(a) for a in self.vertical_accelerations), default=0.0),
             "avg_confidence": sum(self.confidences) / len(self.confidences) if self.confidences else 0.0
         }
 
@@ -132,9 +136,29 @@ class TrajectoryTracker:
     """
     Manages active and historical track records for all objects across a video.
     """
-    def __init__(self, max_history_per_track: int = 150):
+    def __init__(
+        self,
+        max_history_per_track: int = 150,
+        max_active_tracks: int = 500,
+        stale_after_frames: int = 300,
+    ):
         self.max_history = max_history_per_track
+        # ByteTrack mints a new track_id on every flicker/re-acquisition, so
+        # on a long or noisy video this dict would otherwise grow without
+        # bound for the life of the process. Cap it and evict tracks that
+        # haven't been updated in a while (the object left frame / the track
+        # died) rather than letting memory grow unboundedly.
+        self.max_active_tracks = max_active_tracks
+        self.stale_after_frames = stale_after_frames
         self.tracks: Dict[int, TrackRecord] = {}
+
+    def _evict_stale(self, current_frame_idx: int) -> None:
+        stale_ids = [
+            tid for tid, t in self.tracks.items()
+            if t.frames and current_frame_idx - t.frames[-1] > self.stale_after_frames
+        ]
+        for tid in stale_ids:
+            del self.tracks[tid]
 
     def update_track(
         self,
@@ -150,6 +174,8 @@ class TrajectoryTracker:
         Updates an existing track or creates a new one.
         """
         if track_id not in self.tracks:
+            if len(self.tracks) >= self.max_active_tracks:
+                self._evict_stale(frame_idx)
             self.tracks[track_id] = TrackRecord(
                 track_id=track_id,
                 class_id=class_id,

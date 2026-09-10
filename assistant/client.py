@@ -17,6 +17,13 @@ from __future__ import annotations
 import os
 from typing import Optional
 
+try:  # optional - keeps `import assistant` working with nothing installed
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_TIMEOUT_S = 30.0

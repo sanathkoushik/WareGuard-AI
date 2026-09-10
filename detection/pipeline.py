@@ -100,6 +100,13 @@ class DetectionPipeline:
         if not input_path.exists():
             raise FileNotFoundError(f"Input video not found: {input_path}")
 
+        # This pipeline instance may be reused across multiple videos (e.g. a
+        # cached Streamlit resource or a batch script) - clear per-video state
+        # from any prior run so track IDs and trajectories don't bleed across
+        # unrelated clips.
+        self.detector.reset_tracking()
+        self.trajectory_tracker = TrajectoryTracker(max_history_per_track=self.trajectory_tracker.max_history)
+
         # Derive default output paths if not specified
         stem = input_path.stem
         if output_video_path is None:
@@ -193,13 +200,20 @@ class DetectionPipeline:
 
         logger.info(f"Video processing complete in {total_duration:.2f}s ({avg_fps:.1f} FPS)")
 
+        # CAP_PROP_FRAME_COUNT is a container-reported estimate and is
+        # frequently wrong for mp4s that were truncated, corrupt, or muxed
+        # oddly. Recompute duration from frames actually read so a bad
+        # estimate doesn't silently skew events-per-minute downstream in the
+        # risk engine.
+        actual_duration_sec = frame_idx / fps if fps > 0 else 0.0
+
         # Prepare Metadata
         metadata = {
             "video_name": input_path.name,
             "video_path": str(input_path.resolve()),
             "total_frames": frame_idx,
             "fps": fps,
-            "duration_seconds": round(duration_sec, 2),
+            "duration_seconds": round(actual_duration_sec, 2),
             "resolution": [width, height],
             "model_path": self.detector.model_path,
             "processing_time_sec": round(total_duration, 2),

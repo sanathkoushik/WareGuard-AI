@@ -1,6 +1,9 @@
 # Core Vision & AI
 ultralytics>=8.1.0
-opencv-python>=4.8.0
+# headless build: no GUI (imshow/waitKey) is used anywhere in this repo, and
+# headless avoids the libGL.so.1 "ImportError" that opencv-python throws on
+# minimal server/container images (Streamlit Cloud, Docker slim, CI).
+opencv-python-headless>=4.8.0
 numpy>=1.24.0
 pandas>=2.0.0
 torch>=2.0.0
