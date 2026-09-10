@@ -10,8 +10,8 @@
       720
     ],
     "model_path": "yolov8n.pt",
-    "processing_time_sec": 37.11,
-    "processing_fps": 39.64
+    "processing_time_sec": 50.23,
+    "processing_fps": 29.29
   },
   "summary": {
     "total_detections": 8530,

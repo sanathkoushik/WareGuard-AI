@@ -48,3 +48,10 @@ data/processed_videos/*.avi
 data/processed_videos/*.mov
 *.zip
 Mumbai branch*/
+
+# Scratch frames used to assemble docs/demo_video.mp4 - regenerable via
+# docs/build_demo_video.py, not needed in the repo itself.
+docs/_video_frames/
+
+# Stray Keynote auto-conversion artifact from opening the .pptx locally.
+*.key
