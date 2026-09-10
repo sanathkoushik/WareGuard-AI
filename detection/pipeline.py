@@ -29,6 +29,41 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("WareGuard.Pipeline")
 
 
+def _reencode_for_browser_playback(path: Path) -> None:
+    """cv2.VideoWriter's mp4v fourcc writes MPEG-4 Part 2, which Chrome,
+    Safari and Firefox all refuse to play in an HTML5 <video> tag (they need
+    H.264/AVC, VP9 or AV1) - the dashboard's "Annotated Video" player is
+    otherwise silently broken. Re-encode in place via ffmpeg. Best-effort:
+    if ffmpeg isn't on PATH, leave the mp4v file as-is rather than fail the
+    whole detection run over a playback nicety.
+    """
+    import shutil
+    import subprocess
+
+    if shutil.which("ffmpeg") is None:
+        logger.warning(
+            f"ffmpeg not found on PATH - {path.name} was written as mp4v/MPEG-4, "
+            "which most browsers cannot play in a <video> tag. Install ffmpeg "
+            "(e.g. `brew install ffmpeg`) to fix annotated-video playback."
+        )
+        return
+
+    tmp_path = path.with_suffix(".h264.mp4")
+    result = subprocess.run(
+        [
+            "ffmpeg", "-y", "-i", str(path),
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+            "-an", str(tmp_path),
+        ],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0 or not tmp_path.exists():
+        logger.warning(f"ffmpeg re-encode failed for {path.name}: {result.stderr[-500:]}")
+        tmp_path.unlink(missing_ok=True)
+        return
+    tmp_path.replace(path)
+
+
 class DetectionPipeline:
     """
     End-to-end detection and tracking pipeline for warehouse video intelligence.
@@ -151,6 +186,7 @@ class DetectionPipeline:
         cap.release()
         if writer is not None:
             writer.release()
+            _reencode_for_browser_playback(output_video_path)
 
         total_duration = time.time() - start_time
         avg_fps = frame_idx / total_duration if total_duration > 0 else 0.0
