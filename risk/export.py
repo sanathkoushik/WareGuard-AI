@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+from behavior.detectors import RECOMMENDED_ACTIONS
 from .engine import RiskAssessment
 
 EVENT_CSV_FIELDS = [
@@ -109,6 +110,7 @@ def assessment_to_assistant_context(assessment: RiskAssessment) -> Dict[str, Any
                 "track_id": e.track_id,
                 "what_happened": e.description,
                 "why_this_score": e.risk_factors,
+                "recommended_action": RECOMMENDED_ACTIONS.get(e.event_type),
             }
             for e in assessment.ranked()
         ],

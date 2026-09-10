@@ -9,6 +9,35 @@ risk, and answers supervisor questions over the results.
 is the human quickstart, this file and its children are the ground truth for
 agents.
 
+## Commands
+
+`behavior/` and `risk/` need nothing beyond the standard library — the
+commands below run and test them even with `requirements.txt` not installed.
+`detection/` and `dashboard/` need the full vision stack
+(`pip install -r requirements.txt`: torch, ultralytics, opencv, streamlit).
+
+```bash
+# Behavior + risk engine, no video/vision deps needed
+python run_analysis.py --simulate demo                                   # prove the engine on ground-truth tracks
+python run_analysis.py --logs data/logs/detections_sample_warehouse.json # score an existing detection log
+python -m unittest tests.test_behavior tests.test_risk                   # 48 tests, ~0.3s
+python -m unittest tests.test_behavior.TestScenarioDetection.test_drop -v # single test
+
+# Full suite (needs the vision stack — tests.test_pipeline imports ultralytics)
+python -m unittest discover -s tests
+
+# Detection + tracking (needs torch/ultralytics/opencv)
+python utils/video_generator.py                                          # generate a synthetic sample clip
+python run_detection.py --input data/raw_videos/sample_warehouse.mp4
+
+# Assistant (works with no LLM key — falls back to a heuristic responder)
+python run_assistant.py --logs data/logs/events_sim_demo.json --ask "What was the worst event?"
+python -m unittest tests.test_assistant
+
+# Dashboard (needs streamlit + the full stack)
+streamlit run dashboard/app.py
+```
+
 ## Architecture — a pipeline, not a monolith
 
 ```

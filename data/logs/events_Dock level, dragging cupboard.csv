@@ -1,0 +1,1 @@
+event_id,event_type,severity,risk_score,priority_score,confidence,track_id,class_name,start_frame,end_frame,start_time,end_time,duration_seconds,related_track_ids,risk_factors,description

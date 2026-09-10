@@ -1,0 +1,65 @@
+{
+  "summary": {
+    "total_events": 0,
+    "duration_seconds": 15.03,
+    "events_by_type": {
+      "drop": 0,
+      "throw": 0,
+      "drag": 0,
+      "improper_stack": 0,
+      "rough_handling": 0
+    },
+    "events_by_severity": {
+      "Low": 0,
+      "Medium": 0,
+      "High": 0,
+      "Critical": 0
+    },
+    "max_risk_score": 0.0,
+    "mean_risk_score": 0.0,
+    "shift_risk_index": 0.0,
+    "shift_severity": "Low",
+    "events_per_minute": 0.0,
+    "rate_is_reliable": false,
+    "repeat_offender_tracks": [],
+    "top_events": [],
+    "timeline": [
+      {
+        "start_s": 0.0,
+        "end_s": 30.0,
+        "events": 0,
+        "max_risk": 0.0,
+        "types": []
+      }
+    ],
+    "data_quality_warning": null
+  },
+  "events": [],
+  "risk_factors": {},
+  "scene": {
+    "video_name": "Throwing seating cartons, using strap to hold.mp4",
+    "fps": 30.0,
+    "resolution": [
+      1280,
+      720
+    ],
+    "floor_y": 422.77878417968753,
+    "source": "yolo"
+  },
+  "behavior_summary": {
+    "total_events": 0,
+    "event_counts": {
+      "drop": 0,
+      "throw": 0,
+      "drag": 0,
+      "improper_stack": 0,
+      "rough_handling": 0
+    },
+    "total_tracks": 17,
+    "cargo_tracks": 5,
+    "person_tracks": 12,
+    "usable_tracks": 3,
+    "suppressed_events": 0,
+    "data_quality_warning": null
+  }
+}

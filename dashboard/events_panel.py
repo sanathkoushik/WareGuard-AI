@@ -37,6 +37,8 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from behavior.detectors import RECOMMENDED_ACTIONS
+
 try:  # pragma: no cover - trivial import guard
     import streamlit as st
     _HAS_STREAMLIT = True
@@ -683,6 +685,10 @@ def render_event_card(
                 "A baseline plus named contributions — the score always equals "
                 "the sum of these factors."
             )
+
+        recommended_action = RECOMMENDED_ACTIONS.get(event.get("event_type"))
+        if recommended_action:
+            st.markdown(f"**Recommended action:** {recommended_action}")
 
         if allow_seek and start_frame is not None:
             if st.button("🎯 Jump to this event", key=f"seek_{event_id}"):

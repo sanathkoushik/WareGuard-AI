@@ -40,6 +40,33 @@ ALL_EVENT_TYPES = [
     EVENT_ROUGH_HANDLING,
 ]
 
+# Corrective action per event type, for the risk export and the AI assistant.
+# Wording follows the "Good Behaviour / Expected Practice" column of the
+# challenge brief's parameter table, so a supervisor sees the same guidance
+# language the brief itself specifies.
+RECOMMENDED_ACTIONS = {
+    EVENT_DROP: (
+        "Lift and place products gently. Never throw or drop a package "
+        "while loading or unloading."
+    ),
+    EVENT_THROW: (
+        "Lift and place products gently. Never throw or drop a package "
+        "while loading or unloading."
+    ),
+    EVENT_DRAG: (
+        "Use a trolley, pallet truck or suitable handling equipment "
+        "instead of dragging products on the floor."
+    ),
+    EVENT_IMPROPER_STACK: (
+        "Stack larger and heavier packets at the bottom and smaller or "
+        "lighter packets on top. Ensure the complete packet is supported."
+    ),
+    EVENT_ROUGH_HANDLING: (
+        "Handle every product carefully and in a controlled manner, "
+        "particularly at transfer points."
+    ),
+}
+
 
 # --------------------------------------------------------------------------
 # Shared helpers
